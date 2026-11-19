@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IIT JAM Physics 2027 - PYQ Master Tracker</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for crisp icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Firebase SDK Modules for permanent cross-session cloud persistence -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'jam-physics-2027-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    
+    let db = null;
+    let auth = null;
+    let currentUserId = null;
+
+    if (firebaseConfig) {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      auth = getAuth(app);
+
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        currentUserId = auth.currentUser?.uid || 'user-jam-physics';
+      } catch (err) {
+        console.warn("Auth initialization fallback:", err);
+      }
+    }
+
+    window.cloudStorage = {
+      isReady: !!db,
+      userId: currentUserId,
+      saveEntry: async (entry) => {
+        if (db && currentUserId) {
+          const docRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'entries', entry.id);
+          await setDoc(docRef, entry);
+        }
+      },
+      removeEntry: async (entryId) => {
+        if (db && currentUserId) {
+          const docRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'entries', entryId);
+          await deleteDoc(docRef);
+        }
+      },
+      listenToEntries: (callback) => {
+        if (db && currentUserId) {
+          const colRef = collection(db, 'artifacts', appId, 'users', currentUserId, 'entries');
+          return onSnapshot(colRef, (snapshot) => {
+            const list = [];
+            snapshot.forEach(d => list.push(d.data()));
+            callback(list);
+          }, (err) => {
+            console.error("Cloud sync snapshot error:", err);
+          });
+        }
+        return null;
+      }
+    };
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #0b1120;
+      color: #f1f5f9;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white pb-16">
+
+  <!-- TOP APP BAR -->
+  <header class="glass-card sticky top-0 z-50 border-b border-slate-800 px-4 lg:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i class="fa-solid fa-atom text-white text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+            IIT JAM Physics 2027 <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-semibold border border-cyan-500/30">PYQ Tracker</span>
+          </h1>
+          <p class="text-xs text-slate-400">11 Nov 2026 &mdash; 15 Feb 2027 | Goal: 19 Papers (1140 Qs)</p>
+        </div>
+      </div>
+
+      <!-- Quick Stats Top Bar -->
+      <div class="flex items-center gap-3">
+        <button onclick="openModal('addEntryModal')" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium text-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition active:scale-95">
+          <i class="fa-solid fa-plus-circle"></i> <span>Log Solved Questions</span>
+        </button>
+        <button onclick="openModal('reportModal')" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-medium text-sm px-3.5 py-2 rounded-xl flex items-center gap-2 transition active:scale-95">
+          <i class="fa-solid fa-chart-pie"></i> <span class="hidden sm:inline">Report Card</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- STORAGE STATUS PILL -->
+  <div class="max-w-7xl mx-auto w-full px-4 lg:px-8 pt-2">
+    <div class="flex items-center justify-between text-xs py-1 px-3 bg-slate-900/60 rounded-lg border border-slate-800">
+      <span class="text-slate-400 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        Status: <strong class="text-slate-200">Device & Cloud Auto-Save Active</strong>
+      </span>
+      <div class="flex items-center gap-2">
+        <button onclick="exportBackup()" class="text-cyan-400 hover:underline text-[11px] font-medium"><i class="fa-solid fa-download mr-1"></i>Backup JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto w-full px-4 lg:px-8 pt-4 flex-1 space-y-6">
+
+    <!-- KPI / GOAL PROGRESS STATS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Questions Solved (Out of 1140) -->
+      <div class="glass-card rounded-2xl p-4 border-l-4 border-l-cyan-500 flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total PYQ Solved</p>
+            <h3 class="text-2xl font-black text-white mt-1" id="totalQuestionsSolved">0 <span class="text-sm font-normal text-slate-400">/ 1140 Qs</span></h3>
+          </div>
+          <span class="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center"><i class="fa-solid fa-bullseye"></i></span>
+        </div>
+        <div class="mt-3">
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="overallProgressBar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1.5">
+            <span id="overallPercentage">0% Completed</span>
+            <span id="papersEquivalent">0 / 19 Papers</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Today's Target Status (17 to 22 Qs rule) -->
+      <div class="glass-card rounded-2xl p-4 border-l-4 border-l-amber-500 flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Today's Target (17 - 22 Qs)</p>
+            <h3 class="text-2xl font-black text-white mt-1" id="todaySolvedCounter">0 <span class="text-sm font-normal text-slate-400">Solved Today</span></h3>
+          </div>
+          <span class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center"><i class="fa-solid fa-fire"></i></span>
+        </div>
+        <div class="mt-3">
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="todayProgressBar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <p id="todayRemainingMessage" class="text-[11px] font-medium text-amber-300 mt-1.5 truncate">
+            17 Qs remaining for min target
+          </p>
+        </div>
+      </div>
+
+      <!-- Group A vs Group B Balance -->
+      <div class="glass-card rounded-2xl p-4 border-l-4 border-l-purple-500 flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Group Balance</p>
+            <div class="flex items-center gap-3 mt-1">
+              <div>
+                <span class="text-xs text-purple-400 font-semibold">Grp A:</span>
+                <span class="text-lg font-bold text-white ml-1" id="groupATotal">0</span>
+              </div>
+              <span class="text-slate-600">|</span>
+              <div>
+                <span class="text-xs text-emerald-400 font-semibold">Grp B:</span>
+                <span class="text-lg font-bold text-white ml-1" id="groupBTotal">0</span>
+              </div>
+            </div>
+          </div>
+          <span class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center"><i class="fa-solid fa-scale-balanced"></i></span>
+        </div>
+        <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Target Deadline: <strong class="text-slate-200">15 Jan 2027</strong></span>
+          <span id="daysRemainingTillJan15" class="text-cyan-400 font-semibold">-- days</span>
+        </div>
+      </div>
+
+      <!-- Exam Countdown -->
+      <div class="glass-card rounded-2xl p-4 border-l-4 border-l-rose-500 flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Exam Countdown</p>
+            <h3 class="text-2xl font-black text-rose-400 mt-1" id="examCountdownDays">--</h3>
+          </div>
+          <span class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center"><i class="fa-solid fa-graduation-cap"></i></span>
+        </div>
+        <div class="mt-3 text-[11px] text-slate-400">
+          Exam Window: <span class="text-rose-300 font-medium">Mid-Feb 2027 (15 Feb 2027)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATE PICKER & QUICK DAY SELECTOR -->
+    <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 border border-slate-800">
+      <div class="flex items-center gap-3">
+        <label for="currentActiveDate" class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+          <i class="fa-regular fa-calendar-days text-cyan-400"></i> Active Study Date:
+        </label>
+        <input type="date" id="currentActiveDate" min="2026-11-11" max="2027-02-15"
+          class="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 mono"
+          onchange="changeActiveDate(this.value)">
+        <span id="activeDayBadge" class="text-xs px-2.5 py-1 rounded-full bg-cyan-900/50 text-cyan-300 border border-cyan-700/50 font-medium">Day 1</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="shiftDate(-1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
+          <i class="fa-solid fa-chevron-left mr-1"></i> Prev Day
+        </button>
+        <button onclick="setToTodayDate()" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs rounded-lg transition">
+          Today
+        </button>
+        <button onclick="shiftDate(1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
+          Next Day <i class="fa-solid fa-chevron-right ml-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN SYLLABUS INTERFACE: GROUP A & GROUP B -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- GROUP A -->
+      <div class="glass-card rounded-3xl p-5 border border-purple-500/20 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-purple-600/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm">A</span>
+            <div>
+              <h2 class="font-bold text-white text-base">Group A Syllabus</h2>
+              <p class="text-xs text-slate-400">Electricity & Magnetism, Solid State & Electronics, Modern Physics</p>
+            </div>
+          </div>
+          <span id="groupASummaryBadge" class="text-xs px-2.5 py-1 bg-purple-900/40 text-purple-300 rounded-lg border border-purple-700/30 font-semibold mono">0 Qs solved</span>
+        </div>
+
+        <div class="space-y-4" id="groupATopicsList"></div>
+      </div>
+
+      <!-- GROUP B -->
+      <div class="glass-card rounded-3xl p-5 border border-emerald-500/20 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-emerald-600/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">B</span>
+            <div>
+              <h2 class="font-bold text-white text-base">Group B Syllabus</h2>
+              <p class="text-xs text-slate-400">Mechanics, Waves & Optics, Thermodynamics, Mathematical Physics</p>
+            </div>
+          </div>
+          <span id="groupBSummaryBadge" class="text-xs px-2.5 py-1 bg-emerald-900/40 text-emerald-300 rounded-lg border border-emerald-700/30 font-semibold mono">0 Qs solved</span>
+        </div>
+
+        <div class="space-y-4" id="groupBTopicsList"></div>
+      </div>
+
+    </div>
+
+    <!-- CONCEPT FREQUENCY ANALYZER & FREQUENTLY REPEATED CONCEPTS -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-brain text-amber-400"></i> Concept Frequency Analyzer (PYQ Repeat Trends)
+          </h2>
+          <p class="text-xs text-slate-400">Pata lagayein kaunse concepts baar-baar exam me aaye hain taaki targeted revision ho sake</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="conceptFilterGroup" onchange="renderConcepts()" class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-slate-300">
+            <option value="ALL">All Topics</option>
+            <option value="A">Group A Only</option>
+            <option value="B">Group B Only</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="conceptTagContainer" class="flex flex-wrap gap-2 min-h-[60px] items-center"></div>
+    </div>
+
+    <!-- LOGGED SESSIONS FOR SELECTED DATE -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+        <div>
+          <h3 class="font-bold text-white text-base flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-cyan-400"></i> Solved Entries for <span id="displaySelectedDate" class="text-cyan-300 mono underline decoration-cyan-500/40 underline-offset-4">2026-11-11</span>
+          </h3>
+          <p class="text-xs text-slate-400">Entries logged on this specific day</p>
+        </div>
+        <button onclick="openModal('addEntryModal')" class="text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-plus"></i> Add Question Batch
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="text-slate-400 bg-slate-900/60 uppercase text-[10px] tracking-wider">
+            <tr>
+              <th class="px-4 py-2.5 rounded-l-lg">Time/ID</th>
+              <th class="px-4 py-2.5">Group</th>
+              <th class="px-4 py-2.5">Topic</th>
+              <th class="px-4 py-2.5">Questions</th>
+              <th class="px-4 py-2.5">Concepts Covered</th>
+              <th class="px-4 py-2.5">Paper / Year</th>
+              <th class="px-4 py-2.5 rounded-r-lg text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="dayEntriesTableBody" class="divide-y divide-slate-800"></tbody>
+        </table>
+      </div>
+      <div id="noEntriesMessage" class="hidden py-8 text-center text-slate-500 text-xs">
+        <i class="fa-regular fa-clipboard text-2xl mb-2 block"></i>
+        Is din koi question log nahi kiya gaya. Click "+ Log Solved Questions" to record today's practice.
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ADD ENTRY MODAL -->
+  <div id="addEntryModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="glass-card bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 relative">
+      <button onclick="closeModal('addEntryModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
+        <i class="fa-solid fa-circle-plus text-cyan-400"></i> Log Solved Questions
+      </h3>
+      <p class="text-xs text-slate-400 mb-4">Add your daily solved PYQ questions with specific concepts</p>
+
+      <form id="entryForm" onsubmit="saveQuestionEntry(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Study Date</label>
+          <input type="date" id="modalEntryDate" required min="2026-11-11" max="2027-02-15"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Select Group</label>
+            <select id="modalGroupSelect" required onchange="updateTopicOptions()"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500">
+              <option value="Group A">Group A</option>
+              <option value="Group B">Group B</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Questions Solved</label>
+            <input type="number" id="modalQuestio
